@@ -6,7 +6,6 @@
 # python MLChoice.py svm sonar
 
 import sys
-import warnings
 import numpy as np
 from collections import Counter
 import pandas as pd
@@ -21,16 +20,18 @@ SONAR_DATA_FILE = "sonar.txt"
 class MLChoice:
     def __init__(self, choice, dataset):
         self.dataset = dataset
-        self.train, self.test = self.load_data()
         self.choice = choice
+        self.train, self.test = self.load_data()
 
         if choice == "knn":
             k = 5
             self.predict = lambda x: self.knn(x, k)
             self.skl = skl_knn(n_neighbors=k)
         elif choice == "svm":
-            self.predict = self.svm
-            self.skl = skl_svm(kernel="linear", probability=True)
+            n_iter = 1000
+            self.predict = lambda x: self.svm(x, n_iter=n_iter)
+            self.skl = skl_svm(kernel="linear")
+            self.skl.n_iter = n_iter
 
         self.result = self.classify()
         self.log_results()
@@ -57,16 +58,26 @@ class MLChoice:
             else:
                 test_set[i[-1]] = [i[:-1].astype(float)]
 
-        self.X, self.Y = [], []
-        for group in train_set:
-            for data in train_set[group]:
-                self.X.append(data)
-                self.Y.append(group)
+        # for binary classification svm
+        group1, group2 = [*train_set.keys()]
+        train_set = {
+            (-1, group1): train_set[group1],
+            (1, group2): train_set[group2],
+        }
+        test_set = {
+            (-1, group1): test_set[group1],
+            (1, group2): test_set[group2],
+        }
+        self.class_map = {k: v for (k, v) in train_set.keys()}
+        self.X, self.y = [], []
+        for group, group_set in train_set.items():
+            self.X += group_set
+            self.y += [group[0]] * len(group_set)
 
         return train_set, test_set
 
     def log_results(self):
-        ds = "Banke Note" if self.dataset == "banknote" else "Sonar"
+        ds = "Bank Note" if self.dataset == "banknote" else "Sonar"
         print(
             f"DataSet: {ds}\n\n" +
             f"Machine Learning Algorithm Chosen: {self.choice.upper()}\n\n" +
@@ -84,47 +95,73 @@ class MLChoice:
     def random_test_sample(self):
         groups = [*self.test.keys()]
         sample_group = groups[np.random.randint(0, len(groups))]
-        sample_idx = np.random.randint(0, len(self.test[sample_group]))
-        sample = self.test[sample_group][sample_idx]
+        sample_i = np.random.randint(0, len(self.test[sample_group]))
+        sample = self.test[sample_group][sample_i]
+
         prediction = self.predict(sample)
 
-        return sample, prediction, sample_group
+        return sample, self.class_map[prediction], sample_group[1]
 
     def classify(self):
         skl_correct, correct, total = 0, 0, 0
-        self.skl.fit(self.X, self.Y)
+        self.skl.fit(self.X, self.y)
 
         for group in self.test:
             for data in self.test[group]:
                 vote = self.predict(data)
                 skl_vote = self.skl.predict([data])
-                if group == vote:
+                if group[0] == vote:
                     correct += 1
-                if group == skl_vote:
+                if group[0] == skl_vote[0]:
                     skl_correct += 1
                 total += 1
 
         self.accuracy = round(correct / total, 4) * 100
         self.skl_accuracy = round(skl_correct / total, 4) * 100
-        return None
 
     def knn(self, predict, k):
-        data = self.train
-        if len(data) >= k:
-            warnings.warn('K is set to a value less than total voting groups!')
-
         distances = []
-        for group in data:
-            for features in data[group]:
+        for group in self.train:
+            for features in self.train[group]:
                 euclidean_distance = np.linalg.norm(
-                    np.array(features) - np.array(predict))
+                    np.array(features) - np.array(predict)
+                )
                 distances.append([euclidean_distance, group])
         votes = [i[1] for i in sorted(distances)[:k]]
         vote_result = Counter(votes).most_common(1)[0][0]
-        return vote_result
 
-    def svm(self, predict):
-        return 0
+        return vote_result[0]
+
+    def svm(self, predict, n_iter):
+        predict = np.array(predict)
+        result = None
+
+        try:
+            result = np.sign(np.dot(predict, self.w) - self.b)
+        except AttributeError:
+            X, y = np.array(self.X),  np.array(self.y)
+            n_features = X.shape[1]
+
+            y = np.where(y <= 0, -1, 1)
+
+            self.w = np.zeros(n_features)
+            self.b = 0
+            lr = 0.001
+            _lambda = 0.01
+
+            for _ in range(n_iter):
+                for i, x in enumerate(X):
+                    if y[i] * (np.dot(x, self.w) - self.b) >= 1:
+                        self.w -= lr * (2 * _lambda * self.w)
+                    else:
+                        self.w -= lr * (
+                            2 * _lambda * self.w - np.dot(x, y[i])
+                        )
+                        self.b -= lr * y[i]
+
+            result = np.sign(np.dot(predict, self.w) - self.b)
+
+        return result
 
 
 def main():
