@@ -1,5 +1,9 @@
+# William Sigala
+# ID: 1001730022
+
 import pandas as pd
 import numpy as np
+from sklearn.utils import shuffle
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -124,16 +128,26 @@ def load_data(file):
     train = pd.read_csv(file)
     train = train.replace("?", np.nan)
     train = train.fillna(train.median()).astype(np.float64)
+    train = shuffle(train)
     X, Y = train.iloc[:, :-1], train.iloc[:, -1]
 
     return train.columns, X.to_numpy(), Y.to_numpy(dtype="int64")
 
 
-def val_acc(model):
+def validation(model):
     _, X, Y = load_data("bvalidate.csv")
     n = Y.shape[0]
     correct = (model.predict(X) == Y).sum()
     print(f"\nValidation accuracy: {(correct / n * 100):.2f} ")
+
+
+def test(model):
+    feature_names, X, _ = load_data("btest.csv")
+
+    df = pd.DataFrame(X, columns=feature_names[:-1])
+    df["winner"] = model.predict(X)
+
+    df.to_csv("output.csv")
 
 
 def main():
@@ -142,7 +156,8 @@ def main():
     clf = DecisionTree(feature_names, max_depth=5)
     clf.fit(X, Y)
 
-    val_acc(clf)
+    validation(clf)
+    test(clf)
 
 
 if __name__ == "__main__":
