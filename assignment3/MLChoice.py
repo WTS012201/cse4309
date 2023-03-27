@@ -1,10 +1,6 @@
 # William Sigala
 # ID: 1001730022
 
-# sample inputs:
-# python MLChoice.py knn banknote
-# python MLChoice.py svm sonar
-
 import sys
 import numpy as np
 from collections import Counter
