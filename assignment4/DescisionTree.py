@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from sklearn import tree  # for drawing tree
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -9,22 +8,23 @@ warnings.filterwarnings('ignore')
 class Node:
     def __init__(
         self,
-        feature=None,
-        threshold=None,
         left=None,
         right=None,
+        feature=None,
+        threshold=None,
         value=None
     ):
-        self.feature = feature
-        self.threshold = threshold
         self.left = left
         self.right = right
+        self.feature = feature
+        self.threshold = threshold
         self.value = value
 
 
 class DecisionTree:
-    def __init__(self, max_depth=10):
+    def __init__(self, feature_names, max_depth=10):
         self.max_depth = max_depth
+        self.feature_names = feature_names
         self.root = None
 
     def _compute_entropy(self, y):
@@ -71,7 +71,8 @@ class DecisionTree:
 
         self.label_counter = {}
         self.label_counter = {
-            val: 1 if val not in self.label_counter else self.label_counter[val] + 1 for val in y}
+            val: 1 if val not in self.label_counter else
+            self.label_counter[val] + 1 for val in y}
         max = None
         for feature, occurences in self.label_counter.items():
             if max is None or occurences > max[1]:
@@ -86,11 +87,7 @@ class DecisionTree:
         features = np.random.choice(
             self.n_features, self.n_features, replace=False)
         feature, threshold = self._best(X, y, features)
-        print(
-            f"depth: {depth + 1}, " +
-            f"best feature: {feature}, " +
-            f"best threshold: {threshold}"
-        )
+        self._print_node(depth, self.feature_names[feature], f"> {threshold}")
 
         samples = X[:, feature]
         left = np.argwhere(samples <= threshold).flatten()
@@ -99,7 +96,7 @@ class DecisionTree:
         left = self._generate_node(X[left, :], y[left], depth + 1)
         right = self._generate_node(
             X[right, :], y[right], depth + 1)
-        return Node(feature, threshold, left, right)
+        return Node(left, right, feature, threshold)
 
     def _gen_predict(self, x, node):
         if node.value is not None:
@@ -109,15 +106,18 @@ class DecisionTree:
             return self._gen_predict(x, node.left)
         return self._gen_predict(x, node.right)
 
+    def _print_node(self, depth, feature_name, condition):
+        print(f"{depth + 1} ", end="")
+        for _ in range(depth):
+            print("|   ", end="")
+        print(f"|--- {feature_name} {condition}")
+
     def fit(self, X, y):
         self.root = self._generate_node(X, y)
 
     def predict(self, X):
         predictions = [self._gen_predict(x, self.root) for x in X]
         return np.array(predictions)
-
-    def graph():
-        pass
 
 
 def load_data(file):
@@ -126,20 +126,20 @@ def load_data(file):
     train = train.fillna(train.median()).astype(np.float64)
     X, Y = train.iloc[:, :-1], train.iloc[:, -1]
 
-    return X.to_numpy(), Y.to_numpy(dtype="int64")
+    return train.columns, X.to_numpy(), Y.to_numpy(dtype="int64")
 
 
 def val_acc(model):
-    X, Y = load_data("bvalidate.csv")
+    _, X, Y = load_data("bvalidate.csv")
     n = Y.shape[0]
     correct = (model.predict(X) == Y).sum()
     print(f"Validation accuracy: {(correct / n * 100):.2f} ")
 
 
 def main():
-    X, Y = load_data("btrain.csv")
+    feature_names, X, Y = load_data("btrain.csv")
 
-    clf = DecisionTree(max_depth=5)
+    clf = DecisionTree(feature_names, max_depth=5)
     clf.fit(X, Y)
 
     val_acc(clf)
