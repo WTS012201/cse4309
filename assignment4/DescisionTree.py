@@ -133,7 +133,7 @@ def val_acc(model):
     _, X, Y = load_data("bvalidate.csv")
     n = Y.shape[0]
     correct = (model.predict(X) == Y).sum()
-    print(f"Validation accuracy: {(correct / n * 100):.2f} ")
+    print(f"\nValidation accuracy: {(correct / n * 100):.2f} ")
 
 
 def main():
