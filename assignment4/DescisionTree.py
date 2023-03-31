@@ -70,7 +70,7 @@ class DecisionTree:
 
         return feature, thresh
 
-    def _generate_node(self, X, y, depth=0):
+    def _generate_node(self, X, y, depth=0, condition="<="):
         self.n_samples, self.n_features = X.shape
 
         self.label_counter = {}
@@ -91,15 +91,16 @@ class DecisionTree:
         features = np.random.choice(
             self.n_features, self.n_features, replace=False)
         feature, threshold = self._best(X, y, features)
-        self._print_node(depth, self.feature_names[feature], f"> {threshold}")
+        self._print_node(
+            depth, self.feature_names[feature], f"{condition} {threshold:.2f}")
 
         samples = X[:, feature]
         left = np.argwhere(samples <= threshold).flatten()
         right = np.argwhere(samples > threshold).flatten()
 
-        left = self._generate_node(X[left, :], y[left], depth + 1)
+        left = self._generate_node(X[left, :], y[left], depth + 1, "<=")
         right = self._generate_node(
-            X[right, :], y[right], depth + 1)
+            X[right, :], y[right], depth + 1, ">")
         return Node(left, right, feature, threshold)
 
     def _gen_predict(self, x, node):
